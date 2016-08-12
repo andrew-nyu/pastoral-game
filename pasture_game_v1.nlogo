@@ -749,7 +749,7 @@ to listen
       let currentMessagePosition (position hubnet-message-source playerNames);  ;;who the message is coming from, indexed from 0
       let currentPlayer (currentMessagePosition + 1); ;;who the player is, indexed from 1
       
-      if hubnet-message-tag = "View" [  ;; the current player tapped something
+      if (hubnet-message-tag = "View"  and (item (currentPlayer - 1) playerConfirm = 0)) [  ;; the current player tapped something, and the turn isn't yet over
         
         ;;identify the patch
         
@@ -761,8 +761,8 @@ to listen
         ;; if it's a pasture turn and the player taps a pasture, process it as a herd update (patches whose x is > 0 are pasture)
         if (xPatch > 0 and messageAddressed = 0 and (item (currentPhase  - 1) phasePasture = 1)) [ 
                
-          ;; use the update-herd procedure
-          update-herd (currentPlayer)
+          ;; use the update-herd-location procedure
+          update-herd-location (currentPlayer)
           
           ;; message is done
           set messageAddressed 1
@@ -814,6 +814,7 @@ to listen
             set playerTempScores replace-item (currentPlayer - 1) playerTempScores ((item (currentPlayer - 1) playerTempScores) - insureCost)
             
             ;; update info
+            update-herd-count(currentPlayer)
             send-game-info (currentPlayer - 1)
           ]
           
@@ -833,6 +834,7 @@ to listen
             set playerTempScores replace-item (currentPlayer - 1) playerTempScores ((item (currentPlayer - 1) playerTempScores) + insureCost)
             
             ;; update info
+            update-herd-count(currentPlayer)
             send-game-info (currentPlayer - 1)
           ]
           
@@ -865,6 +867,7 @@ to listen
           ]
           
           ;; send info to player
+          update-herd-count(currentPlayer)
           send-game-info (currentPlayer - 1)
           
           ;; message done
@@ -901,6 +904,7 @@ to listen
           ]
           
           ;; update info
+          update-herd-count(currentPlayer)
           send-game-info (currentPlayer - 1)
           
           ;; message addressed
@@ -920,6 +924,7 @@ to listen
           ]    
           
           ;; update info and mark message addressed
+          update-herd-count(currentPlayer)
           send-game-info (currentPlayer - 1)
           set messageAddressed 1
         ]
@@ -945,6 +950,7 @@ to listen
           ]   
           
           ;; update info and mark message addressed
+          update-herd-count(currentPlayer)
           send-game-info (currentPlayer - 1)
           set messageAddressed 1
         ]
@@ -983,6 +989,7 @@ to listen
           ]
           
           ;; update info and mark message addressed
+          update-herd-count(currentPlayer)
           send-game-info (currentPlayer - 1)
           set messageAddressed 1
         ]        
@@ -1027,6 +1034,7 @@ to listen
           ]          
           
           ;; update info and mark message addressed
+          update-herd-count(currentPlayer)
           send-game-info (currentPlayer - 1)
           set messageAddressed 1
         ] 
@@ -1169,14 +1177,8 @@ to advance-phase
       set playerTempCalves replace-item (currentPlayer - 1) playerTempCalves replace-item 0 (item (currentPlayer - 1) playerTempCalves) 0
 
 
-      ;; replace animal agents with the appropriate current herd
-      let currentPasture -88
-      if (item (currentPlayer - 1) playerHerdOnBoard = 1) [
-        set currentPasture [usingPasture] of one-of animals with [owner = currentPlayer]
-      ]
-      let animalsToPlace sum (item (currentPlayer - 1) playerTempHerds) + sum (item (currentPlayer - 1) playerTempCalves)
-      ask animals with [owner = currentPlayer] [die]
-      place-animals animalsToPlace currentPlayer currentPasture
+      update-herd-count(currentPlayer)
+      
     ]
     
     ;;If the previous turn was a pasturing turn (i.e., actual time passed), then run grass model.    
@@ -1248,6 +1250,7 @@ to advance-phase
               let guessPhase random numPhases
               if item guessPhase item (owner - 1) playerTempCalves > 0 [
                 set playerTempCalves replace-item (owner - 1) playerTempCalves replace-item guessPhase (item (owner - 1) playerTempCalves) ((item guessPhase (item (owner - 1) playerTempCalves)) - 1) 
+                set culledCalf true
               ]
             ]
           ] [
@@ -1285,7 +1288,11 @@ to advance-phase
       set playerHerds replace-item (? - 1) playerHerds (item (? - 1) playerTempHerds)
       set playerScores replace-item (? - 1) playerScores (item (? - 1) playerTempScores)
       set playerCalves replace-item (? - 1) playerCalves (item (? - 1) playerTempCalves)
-      set playerInsuredAnimals replace-item (? - 1) playerInsuredAnimals (item (? - 1) playerTempInsuredAnimals)       
+      set playerInsuredAnimals replace-item (? - 1) playerInsuredAnimals (item (? - 1) playerTempInsuredAnimals)     
+      
+      ; are there any animals in the herd?
+      let animalsInHerd sum (item (? - 1) playerHerds) + sum (item (? - 1) playerCalves)
+      if animalsInHerd = 0 [set playerHerdOnBoard replace-item (? - 1) playerHerdOnBoard 0]
     ]
     
     
@@ -1390,6 +1397,25 @@ to end-game
   
 end
 
+to update-herd-count [currentPlayer]
+  
+  ;; replace animal agents with the appropriate current herd
+  let currentPasture -88
+  if ((item (currentPlayer - 1) playerHerdOnBoard = 1) and (count animals with [owner = currentPlayer]) > 0)[
+    set currentPasture [usingPasture] of one-of animals with [owner = currentPlayer]
+  ]
+  let animalsInHerd sum (item (currentPlayer - 1) playerTempHerds) + sum (item (currentPlayer - 1) playerTempCalves)
+  let animalsAlready count animals with [owner = currentPlayer] 
+  let animalsToPlace (animalsInHerd - animalsAlready)
+  if (animalsToPlace < 0) [
+   ask n-of abs(animalsToPlace) animals with [owner = currentPlayer] [die]
+   set animalsToPlace 0 
+  ]
+
+  place-animals animalsToPlace currentPlayer currentPasture
+  
+end
+
 to send-game-info [currentPosition]
   
   ;; sends current, player-specific game info to the specified player.  this is done by asking 'scorecard' agents to override the label they are showing to the particular player
@@ -1443,9 +1469,8 @@ to place-animals [animalsToPlace currentPlayer currentPasture]
   
   ; if there are animals to place
   while [animalsToPlace > 0] [
-    
     ; check if they are currently on the board or not - the code -88 is used for 'not currently pastured'
-    ifelse (currentPasture > 0) [ ;;animals are on a pasture
+    ifelse (currentPasture >= 0) [ ;;animals are on a pasture
       
       ; if they're in a pasture, place animals in that pasture
       ask one-of patches with [pastureNumber = currentPasture] [
@@ -1478,13 +1503,23 @@ to place-animals [animalsToPlace currentPlayer currentPasture]
   ]
   
   ;; update the state and age of the herd as appropriate.  note that 'state' for calves is unused and not relevant
-  ask n-of (item 0 item (currentPlayer - 1) playerHerds) animals with [owner = currentPlayer] [ set color color - 2 set state 0]
-  ask n-of (sum (item (currentPlayer - 1) playerCalves)) animals with [owner = currentPlayer and color = item (currentPlayer - 1) playerHerdColor] [ set age "calf" set color color - 2 set state 0]
-  ask n-of (item 2 item (currentPlayer - 1) playerHerds) animals with [owner = currentPlayer and color = item (currentPlayer - 1) playerHerdColor] [ set color color + 2 set state 1]
+  ask animals with [owner = currentPlayer] [ 
+    set color item (currentPlayer - 1) playerHerdColor 
+    set state 1
+    
+    if currentPasture >= 0 [
+      let newPatch one-of patches with [pastureNumber = currentPasture]               
+      setxy ([pxcor] of newPatch - 0.5 + random-float 1) ([pycor] of newPatch - 0.5 + random-float 1)
+    ]
+  ]
+  
+  ask n-of (item 0 item (currentPlayer - 1) playerTempHerds) animals with [owner = currentPlayer] [ set color color - 2 set state 0]
+  ask n-of (sum (item (currentPlayer - 1) playerTempCalves)) animals with [owner = currentPlayer and color = item (currentPlayer - 1) playerHerdColor] [ set age "calf" set color color - 2 set state 0]
+  ask n-of (item 2 item (currentPlayer - 1) playerTempHerds) animals with [owner = currentPlayer and color = item (currentPlayer - 1) playerHerdColor] [ set color color + 2 set state 1]
   
 end
 
-to update-herd [ currentPlayer ] 
+to update-herd-location [ currentPlayer ] 
   
   ;; executed whenever a player clicks on a pasture patch during a pasture turn
   
@@ -1498,7 +1533,8 @@ to update-herd [ currentPlayer ]
   
   ; identify what pasture it belongs to
   let currentPasture [pastureNumber] of patch xPatch yPatch
-  
+ 
+      
   ; see if the player's herd is currently in a pasture
   ifelse (item (currentPlayer - 1) playerHerdOnBoard = 0) [
     ;; herd is not on the board - place them here
