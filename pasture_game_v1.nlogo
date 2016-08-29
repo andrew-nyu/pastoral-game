@@ -60,6 +60,9 @@ globals [
   buyAnimalsPixLoc
   sellAnimalsPixLoc
   herdPixLoc
+  poorPixLoc
+  okPixLoc
+  goodPixLoc
   calvesPixLoc
   yearPixLoc
   phasePixLoc
@@ -68,7 +71,10 @@ globals [
   fodderTile
   buyAnimalsTile
   sellAnimalsTile
-  herdTile  
+  herdTile
+  poorTile
+  okTile
+  goodTile  
   calvesTile
   yearTile
   phaseTile
@@ -361,9 +367,21 @@ to set-language
   set sellAnimalsTile bitmap:import (word "./image_label/sell_animals_" langSuffix ".png")
   bitmap:copy-to-drawing (bitmap:scaled sellAnimalsTile (item 2 sellAnimalsPixLoc) (item 3 sellAnimalsPixLoc)) (item 0 sellAnimalsPixLoc) (item 1 sellAnimalsPixLoc)
   
-  set herdPixLoc (list (20 * yConvertPatch * xyConvertPatchPixel) (390 * yConvertPatch * xyConvertPatchPixel) (75 * yConvertPatch * xyConvertPatchPixel) (50 * yConvertPatch * xyConvertPatchPixel))
+  set herdPixLoc (list (20 * yConvertPatch * xyConvertPatchPixel) (420 * yConvertPatch * xyConvertPatchPixel) (75 * yConvertPatch * xyConvertPatchPixel) (50 * yConvertPatch * xyConvertPatchPixel))
   set herdTile bitmap:import (word "./image_label/herd_state_" langSuffix ".png")
   bitmap:copy-to-drawing (bitmap:scaled herdTile (item 2 herdPixLoc) (item 3 herdPixLoc)) (item 0 herdPixLoc) (item 1 herdPixLoc)
+   
+  set poorPixLoc (list (140 * yConvertPatch * xyConvertPatchPixel) (380 * yConvertPatch * xyConvertPatchPixel) (50 * yConvertPatch * xyConvertPatchPixel) (50 * yConvertPatch * xyConvertPatchPixel))
+  set poorTile bitmap:import (word "./image_label/poor_" langSuffix ".png")
+  bitmap:copy-to-drawing (bitmap:scaled poorTile (item 2 poorPixLoc) (item 3 poorPixLoc)) (item 0 poorPixLoc) (item 1 poorPixLoc)
+   
+  set okPixLoc (list (250 * yConvertPatch * xyConvertPatchPixel) (380 * yConvertPatch * xyConvertPatchPixel) (50 * yConvertPatch * xyConvertPatchPixel) (50 * yConvertPatch * xyConvertPatchPixel))
+  set okTile bitmap:import (word "./image_label/ok_" langSuffix ".png")
+  bitmap:copy-to-drawing (bitmap:scaled okTile (item 2 okPixLoc) (item 3 okPixLoc)) (item 0 okPixLoc) (item 1 okPixLoc)
+   
+  set goodPixLoc (list (360 * yConvertPatch * xyConvertPatchPixel) (380 * yConvertPatch * xyConvertPatchPixel) (50 * yConvertPatch * xyConvertPatchPixel) (50 * yConvertPatch * xyConvertPatchPixel))
+  set goodTile bitmap:import (word "./image_label/good_" langSuffix ".png")
+  bitmap:copy-to-drawing (bitmap:scaled goodTile (item 2 goodPixLoc) (item 3 goodPixLoc)) (item 0 goodPixLoc) (item 1 goodPixLoc)
    
   set calvesPixLoc (list (20 * yConvertPatch * xyConvertPatchPixel) (310 * yConvertPatch * xyConvertPatchPixel) (75 * yConvertPatch * xyConvertPatchPixel) (50 * yConvertPatch * xyConvertPatchPixel))
   set calvesTile bitmap:import (word "./image_label/calves_" langSuffix ".png")
@@ -533,9 +551,9 @@ to start-game
   let xyConvertPatchPixel (patch-size / 14)  ;; scaling vertical and horizontal measures based on currently optimized patch size of 14
   
   ;;lay out the agents that will provide score and other display information.  These too are optimized to a Dell Venue 8, with grid size 80x50, patch size 14, and may need adjustments if changes are made             
-  create-scorecards 1 [setxy (-20 * yConvertPatch) (max-pycor - 28.5  * yConvertPatch) set label 0 set identity "poorHerd"]
-  create-scorecards 1 [setxy (-12 * yConvertPatch) (max-pycor - 28.5  * yConvertPatch) set label 0 set identity "okHerd"]
-  create-scorecards 1 [setxy (-4 * yConvertPatch) (max-pycor - 28.5  * yConvertPatch) set label 0 set identity "goodHerd"]  
+  create-scorecards 1 [setxy (-20 * yConvertPatch) (max-pycor - 30.5  * yConvertPatch) set label 0 set identity "poorHerd"]
+  create-scorecards 1 [setxy (-12 * yConvertPatch) (max-pycor - 30.5  * yConvertPatch) set label 0 set identity "okHerd"]
+  create-scorecards 1 [setxy (-4 * yConvertPatch) (max-pycor - 30.5  * yConvertPatch) set label 0 set identity "goodHerd"]  
   create-scorecards 1 [setxy (-20 * yConvertPatch) (max-pycor - 22.5  * yConvertPatch) set label 0 set identity "calves"] 
   create-scorecards 1 [setxy (-4 * yConvertPatch) (max-pycor - 22.5  * yConvertPatch) set label 0 set identity "insuredAnimals"] 
   create-scorecards 1 [setxy (-20 * yConvertPatch) (max-pycor - 41.5  * yConvertPatch) set label 0 set identity "year"] 
@@ -1511,6 +1529,12 @@ to place-animals [animalsToPlace currentPlayer currentPasture]
       let newPatch one-of patches with [pastureNumber = currentPasture]               
       setxy ([pxcor] of newPatch - 0.5 + random-float 1) ([pycor] of newPatch - 0.5 + random-float 1)
     ]
+  ]
+  
+  ask one-of animals with [owner = currentPlayer] [
+   set label item (owner - 1) playerShortNames 
+   set label-color item (owner - 1) colorList 
+    
   ]
   
   ask n-of (item 0 item (currentPlayer - 1) playerTempHerds) animals with [owner = currentPlayer] [ set color color - 2 set state 0]
